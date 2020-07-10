@@ -177,7 +177,7 @@ classdef TIFFStack < handle
    
    methods
       % TIFFStack - CONSTRUCTOR
-      function oStack = TIFFStack(strFilename, bInvert, vnInterleavedFrameDims, bForceTiffread)
+      function oStack = TIFFStack(strFilename, bInvert, vnInterleavedFrameDims, bForceTiffread,num_dirs)
          % - Check usage
          if (~exist('strFilename', 'var') || ~ischar(strFilename))
             help TIFFStack;
@@ -190,6 +190,10 @@ classdef TIFFStack < handle
             bForceTiffread = false;
          end
          oStack.bForceTiffread = bForceTiffread;
+         
+         if nargin < 5
+             num_dirs = [];
+         end
          
          % - Can we use the accelerated TIFF library?
          if (exist('tifflib') ~= 3) %#ok<EXIST>
@@ -236,7 +240,7 @@ classdef TIFFStack < handle
          % - Get image information
          try
             % - Read and store image information (using tiffread for speed and compatibility)
-            [oStack.TIF, oStack.HEADER, sInfo] = tiffread31_header(strFilename);
+            [oStack.TIF, oStack.HEADER, sInfo] = tiffread31_header(strFilename,num_dirs);
             oStack.TIF_tr31 = oStack.TIF;
             
             % - Detect a ImageJ fake BigTIFF stack

@@ -1,4 +1,7 @@
-function [TIF, HEADER, INFO] = tiffread31_header(file_name)
+function [TIF, HEADER, INFO] = tiffread31_header(file_name,num_dirs)
+if nargin < 2
+    num_dirs = [];
+end
 
 DEF_nPreallocateBlock = 1000;
 DEF_HEADER = struct( 'SamplesPerPixel', [], 'index', [], 'ifd_pos', [], ...
@@ -153,7 +156,11 @@ ifd_pos = fread(TIF.file, 1, TIF.strIFDClassSize, TIF.ByteOrder);
 img_indx = 0;
 
 % - Attempt to preallocate
-nPreallocateBlock = DEF_nPreallocateBlock;
+if isempty(num_dirs)
+    nPreallocateBlock = DEF_nPreallocateBlock;
+else
+    nPreallocateBlock = num_dirs;
+end
 HEADER(nPreallocateBlock) = DEF_HEADER;
 INFO(nPreallocateBlock) = DEF_INFO;
 
@@ -161,6 +168,49 @@ INFO(nPreallocateBlock) = DEF_INFO;
 while (ifd_pos ~= 0)
 
    img_indx = img_indx + 1;
+   
+   % Assume the sizes of the IFDs are the same that the number of directories
+   % is correct if supplied. Generate the header files for the number of
+   % directories based on the 2 first headers.
+   if img_indx == 3 && ~isempty(num_dirs)
+       ifd_pos_delta = HEADER(2).ifd_pos - HEADER(1).ifd_pos;
+       strip_offset_delta = HEADER(2).StripOffsets - HEADER(2).ifd_pos;
+       
+       ifd_pos_vec = HEADER(1).ifd_pos + (0:num_dirs-1) * ifd_pos_delta;
+       strip_offset_vec = ifd_pos_vec + strip_offset_delta;
+       index_vec = 1:num_dirs;
+       
+       ifd_pos_vec = num2cell(ifd_pos_vec);
+       strip_offset_vec = num2cell(strip_offset_vec);
+       index_vec = num2cell(index_vec);
+       
+       [HEADER.ifd_pos] = deal(ifd_pos_vec{:});
+       [HEADER.StripOffsets] = deal(strip_offset_vec{:});
+       [HEADER.index] = deal(index_vec{:});
+       
+       [HEADER.SamplesPerPixel] = deal(HEADER(1).SamplesPerPixel);
+       [HEADER.width] = deal(HEADER(1).width);
+       [HEADER.height] = deal(HEADER(1).height);
+       [HEADER.bits] = deal(HEADER(1).bits);
+       [HEADER.StripNumber] = deal(HEADER(1).StripNumber);
+       [HEADER.RowsPerStrip] = deal(HEADER(1).RowsPerStrip);
+       [HEADER.StripByteCounts] = deal(HEADER(1).StripByteCounts);
+       [HEADER.cmap] = deal(HEADER(1).cmap);
+       [HEADER.colors] = deal(HEADER(1).colors);
+       
+       [INFO.SamplesPerPixel] = deal(INFO(1).SamplesPerPixel);
+       [INFO.ByteOrder] = deal(INFO(1).ByteOrder);
+       [INFO.Width] = deal(INFO(1).Width);
+       [INFO.Height] = deal(INFO(1).Height);
+       [INFO.BitsPerSample] = deal(INFO(1).BitsPerSample);
+       [INFO.RowsPerStrip] = deal(INFO(1).RowsPerStrip);
+       [INFO.PlanarConfiguration] = deal(INFO(1).PlanarConfiguration);
+       [INFO.MaxSampleValue] = deal(INFO(1).MaxSampleValue);
+       [INFO.MinSampleValue] = deal(INFO(1).MinSampleValue);
+       
+       img_indx = num_dirs;
+       break
+   end
    
    % - Extend arrays
    if (img_indx > nPreallocateBlock)
