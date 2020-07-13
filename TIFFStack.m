@@ -529,6 +529,9 @@ classdef TIFFStack < handle
 
       function [varargout] = subsref(oStack, S)
          switch S(1).type
+            case '.'
+               varargout{:} = builtin('subsref',oStack,S);
+               return
             case '()'
                % - Test for valid subscripts
                cellfun(@isvalidsubscript, S.subs);
