@@ -151,9 +151,12 @@
 classdef TIFFStack < handle
    properties
       bInvert;             % - A boolean flag that determines whether or not the image data will be inverted
+      vnReducedDimensions  % - Vector of fixed dimensions
    end
    
    properties (SetAccess = private)
+      vnDataSize;          % - Cached size of the TIFF stack
+      vnApparentSize;      % - Apparent size of the TIFF stack
       strFilename = [];    % - The name of the TIFF file on disk
       sImageInfo;          % - The TIFF header information
       strDataClass;        % - The matlab class in which data will be returned
@@ -161,8 +164,6 @@ classdef TIFFStack < handle
    
    properties (SetAccess = private, GetAccess = private)
       bForceTiffread       % - Force the use of tiffread, rather than trying to use TiffLib
-      vnDataSize;          % - Cached size of the TIFF stack
-      vnApparentSize;      % - Apparent size of the TIFF stack
       TIF;                 % \
       TIF_tr31;            % |- Cached header info for tiffread31 speedups
       HEADER;              % /
@@ -487,6 +488,9 @@ classdef TIFFStack < handle
             new_ME = addCause(base_ME, mErr);
             throw(new_ME);
          end
+         
+         % Init reduced dimensions. 
+         oStack.vnReducedDimensions = zeros(size(oStack.vnApparentSize));
       end
       
       % delete - DESTRUCTOR
@@ -539,7 +543,10 @@ classdef TIFFStack < handle
                % - Record stack size
                nNumRefDims = numel(S.subs);
                
-               vnReferencedTensorSize = size(oStack);
+               vnReferencedTensorSize = oStack.vnApparentSize;
+               while vnReferencedTensorSize(end) == 1
+                   vnReferencedTensorSize(end) = [];
+               end
                nNumNZStackDims = numel(vnReferencedTensorSize);
                nNumTotalStackDims = max(numel(oStack.vnDimensionOrder), nNumNZStackDims);
                
@@ -548,6 +555,24 @@ classdef TIFFStack < handle
                vnFullTensorSize(vnFullTensorSize == 0) = 1;
                
                bLinearIndexing = false;
+                   
+               % - Get the vector of reduced dimensions without trailing unitary dimensions. 
+               vnReducedDimensions = oStack.vnReducedDimensions(1:nNumNZStackDims);
+               
+               % - Modify the subs if any dimensions are reduced. 
+               if any(vnReducedDimensions > 0)
+                   assert(nNumRefDims == ndims(oStack),'When using reduced dimensions all remaining dimensions must be referenced');
+                   
+                   % - Insert the reduced dimensions into the subs so all dimensions are referenced.
+                   vnNewSubs = cell(1,nNumNZStackDims);
+                   I = vnReducedDimensions > 0;
+                   vnNewSubs(~I) = S.subs(:);
+                   vnNewSubs(I) = num2cell(vnReducedDimensions(I));
+                   S.subs = vnNewSubs;
+                   
+                   % - Update the number of referenced dimensions. 
+                   nNumRefDims = numel(S.subs);
+               end
                
                % - Convert logical indexing to indices
                for (nDim = 1:numel(S.subs))
@@ -565,12 +590,11 @@ classdef TIFFStack < handle
 
                   else
                      % - Get equivalent subscripted indexes and permute
-                     vnTensorSize = size(oStack);
-                     if any(S.subs{1}(:) > prod(vnTensorSize))
+                     if any(S.subs{1}(:) > prod(vnReferencedTensorSize))
                         error('TIFFStack:badsubscript', ...
                            '*** TIFFStack: Index exceeds stack dimensions.');
                      else
-                        [cIndices{1:nNumTotalStackDims}] = ind2sub(vnTensorSize, S.subs{1});
+                        [cIndices{1:nNumTotalStackDims}] = ind2sub(vnReferencedTensorSize, S.subs{1});
                      end
                      
                      % - Permute dimensions
@@ -614,6 +638,15 @@ classdef TIFFStack < handle
                   S.subs(nNumNZStackDims+1:nNumTotalStackDims) = {1};
                   vnInvOrder(oStack.vnDimensionOrder(1:nNumTotalStackDims)) = 1:nNumTotalStackDims;
                   S.subs = S.subs(vnInvOrder(vnInvOrder ~= 0));
+                  
+                  % - Remove reduced dimensions
+                  if any(vnReducedDimensions > 0)
+                    vnRetDataSize(vnReducedDimensions > 0) = [];
+                  end
+                  % - Default to a column vector if only one dimension remains. 
+                  if length(vnRetDataSize) == 1
+                      vnRetDataSize(2) = 1;
+                  end
                   
                else % (nNumRefDims > nNumNZStackDims)
                   % - Check for non-colon references
@@ -659,7 +692,6 @@ classdef TIFFStack < handle
                   [varargout{1:nargout}] = zeros(vnRetDataSize);
                   return;
                end
-               
                % - Re-interleave frame indices for deinterleaved stacks
                if (numel(oStack.vnApparentSize) > 4)
                   % - Record output data size in deinterleaved space
@@ -686,7 +718,6 @@ classdef TIFFStack < handle
                      S.subs = [S.subs(1:2) reshape(vnFrameIndices, [], 1) S.subs(end)];
                   end
                end
-
                % - Access stack (MappedTensor or tifflib or tiffread)
                if (oStack.bMTStack)
                   tfData = TS_read_data_MappedTensor(oStack, S.subs, bLinearIndexing);
@@ -772,6 +803,11 @@ classdef TIFFStack < handle
          % - Return the size of the tensor data element, permuted
          vnSize = vnApparentSize(oStack.vnDimensionOrder); %#ok<PROPLC,PROP>
          
+         % - Remove reduced dimensions
+         if any(oStack.vnReducedDimensions > 0)
+             vnSize(oStack.vnReducedDimensions > 0) = [];
+         end
+         
          % - Trim trailing unitary dimensions
          vbIsUnitary = vnSize == 1;
          if (vbIsUnitary(end))
@@ -827,6 +863,10 @@ classdef TIFFStack < handle
       
       % permute - METHOD Overloaded permute function
       function [oStack] = permute(oStack, vnNewOrder)
+         if any(oStack.vnReducedDimensions > 0)
+            error('TIFFStack:Permute', ...
+               '*** TIFFStack: Permutation with reduced dimensions is not implemented.');
+         end
          oStack.vnDimensionOrder(1:numel(vnNewOrder)) = oStack.vnDimensionOrder(vnNewOrder);
       end
       
@@ -1106,7 +1146,12 @@ classdef TIFFStack < handle
             % - Assign bInvert value
             oStack.bInvert = bInvert;
          end
-      end            
+      end       
+      
+      function set.vnReducedDimensions(oStack,vnReducedDimensions)
+          assert(isequal(size(vnReducedDimensions),size(oStack.vnApparentSize)));
+          oStack.vnReducedDimensions = vnReducedDimensions;
+      end
       
 %% --- Overloaded save method
       % saveobj - Save method
