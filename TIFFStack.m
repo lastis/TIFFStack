@@ -543,10 +543,13 @@ classdef TIFFStack < handle
                % - Record stack size
                nNumRefDims = numel(S.subs);
                
-               vnReferencedTensorSize = oStack.vnApparentSize;
-               while vnReferencedTensorSize(end) == 1
-                   vnReferencedTensorSize(end) = [];
-               end
+               % Hack to run size(oStack) without reduced dimensions when 
+               % having reduced dimensions. 
+               tmp = oStack.vnReducedDimensions;
+               oStack.vnReducedDimensions = zeros(1,length(oStack.vnApparentSize));
+               vnReferencedTensorSize = size(oStack);
+               oStack.vnReducedDimensions = tmp;
+               
                nNumNZStackDims = numel(vnReferencedTensorSize);
                nNumTotalStackDims = max(numel(oStack.vnDimensionOrder), nNumNZStackDims);
                
