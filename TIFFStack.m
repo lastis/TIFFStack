@@ -152,6 +152,7 @@ classdef TIFFStack < handle
    properties
       bInvert;             % - A boolean flag that determines whether or not the image data will be inverted
       vnReducedDimensions  % - Vector of fixed dimensions
+      strReturnedDataClass % - Class of the return data type in subsref
    end
    
    properties (SetAccess = private)
@@ -491,6 +492,8 @@ classdef TIFFStack < handle
          
          % Init reduced dimensions. 
          oStack.vnReducedDimensions = zeros(size(oStack.vnApparentSize));
+         
+         oStack.strReturnedDataClass = oStack.strDataClass;
       end
       
       % delete - DESTRUCTOR
@@ -533,9 +536,6 @@ classdef TIFFStack < handle
 
       function [varargout] = subsref(oStack, S)
          switch S(1).type
-            case '.'
-               varargout{:} = builtin('subsref',oStack,S);
-               return
             case '()'
                % - Test for valid subscripts
                cellfun(@isvalidsubscript, S.subs);
@@ -692,7 +692,7 @@ classdef TIFFStack < handle
                
                % - Catch empty refs
                if (prod(vnRetDataSize) == 0)
-                  [varargout{1:nargout}] = zeros(vnRetDataSize);
+                  [varargout{1:nargout}] = zeros(vnRetDataSize,oStack.strReturnedDataClass);
                   return;
                end
                % - Re-interleave frame indices for deinterleaved stacks
@@ -745,6 +745,8 @@ classdef TIFFStack < handle
                   tfData = reshape(tfData, vnRetDataSize);
                end
                
+               % Cast output.
+               tfData = cast(tfData,oStack.strReturnedDataClass);
                [varargout{1:nargout}] = tfData;
                
             otherwise
