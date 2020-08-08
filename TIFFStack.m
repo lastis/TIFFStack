@@ -153,6 +153,7 @@ classdef TIFFStack < handle
       bInvert;             % - A boolean flag that determines whether or not the image data will be inverted
       vnReducedDimensions  % - Vector of fixed dimensions
       strReturnedDataClass % - Class of the return data type in subsref
+      vnDimensionOrder;    % - Internal dimensions order to support permutation
    end
    
    properties (SetAccess = private)
@@ -172,7 +173,6 @@ classdef TIFFStack < handle
       bMTStack;            % - Flag indicating MappedTensor is being used
       fhReadFun;           % - When using Tiff class, function for reading data
       fhSetDirFun;         % - When using Tiff class, function for setting the directory
-      vnDimensionOrder;    % - Internal dimensions order to support permutation
       fhRepSum;            % - Function handle to (hopefully) accellerated repsum function
       fhCastFun;           % - The matlab function that casts data to the required return class
    end
