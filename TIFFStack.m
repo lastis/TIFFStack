@@ -164,7 +164,7 @@ classdef TIFFStack < handle
       strDataClass;        % - The matlab class in which data will be returned
    end
    
-   properties (SetAccess = private, GetAccess = private)
+   properties %(SetAccess = private, GetAccess = private)
       bForceTiffread       % - Force the use of tiffread, rather than trying to use TiffLib
       TIF;                 % \
       TIF_tr31;            % |- Cached header info for tiffread31 speedups

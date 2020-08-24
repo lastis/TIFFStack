@@ -171,17 +171,17 @@ while (ifd_pos ~= 0)
    
    % Assume the sizes of the IFDs are the same that the number of directories
    % is correct if supplied. Generate the header files for the number of
-   % directories based on the 2nd and 3rd headers.
-   if img_indx == 4 && ~isempty(num_dirs)
-       ifd_pos_delta = HEADER(3).ifd_pos - HEADER(2).ifd_pos;
-       strip_offset_delta = HEADER(3).StripOffsets - HEADER(2).ifd_pos;
+   % directories based on the 3rd and 4th headers.
+   if img_indx == 5 && ~isempty(num_dirs)
+       ifd_pos_delta = HEADER(4).ifd_pos - HEADER(3).ifd_pos;
+       strip_offset_delta = HEADER(4).StripOffsets - HEADER(3).StripOffsets;
        
        % Start counting from the seconds header to allow the first header
        % to have different information/tags than the rest of the headers.
        % After that assume the rest of the headers are the same size. 
-       ifd_pos_vec = HEADER(2).ifd_pos + (0:num_dirs-2) * ifd_pos_delta;
-       strip_offset_vec = ifd_pos_vec + strip_offset_delta - ifd_pos_delta;
-       index_vec = 2:num_dirs;
+       ifd_pos_vec = HEADER(3).ifd_pos + (0:num_dirs-3) * ifd_pos_delta;
+       strip_offset_vec = HEADER(3).StripOffsets + (0:num_dirs-3) * strip_offset_delta;
+       index_vec = 3:num_dirs;
        
        % Transform to cell to make use of the deal function later. 
        ifd_pos_vec = num2cell(ifd_pos_vec);
@@ -189,8 +189,8 @@ while (ifd_pos ~= 0)
        index_vec = num2cell(index_vec);
        
        % Remove the first header and insert it back in later. 
-       header_tmp = HEADER(1);
-       HEADER(1) = [];
+       header_tmp = HEADER(1:2);
+       HEADER(1:2) = [];
        
        % Assign the assumed ifd_positions and offsets
        [HEADER.ifd_pos] = deal(ifd_pos_vec{:});
